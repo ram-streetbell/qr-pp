@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { randomBytes, randomUUID, createHash } from 'node:crypto';
 import { readFile, writeFile } from 'node:fs/promises';
 import { existsSync, mkdirSync } from 'node:fs';
+import { join } from 'node:path';
 import { fetchPetpoojaMenu, submitPetpoojaOrder } from './petpooja.js';
 
 type Table={id:string;number:string;status:'available'|'active'};
@@ -18,6 +19,7 @@ const app=express();
 app.use(cors({origin:process.env.CORS_ORIGIN?.split(',')||true}));
 app.use(express.json({limit:'1mb'}));
 const port=Number(process.env.PORT||8080),ttl=Number(process.env.QR_TTL_MINUTES||360),dbFile=process.env.DATA_FILE||'./data/store.json';
+const customerPage=join(process.cwd(),'customer-web','index.html');
 const defaultMenu:Item[]=[{id:'item-1',name:'Paneer Butter Masala',category:'Main Course',price:220},{id:'item-2',name:'Chicken Biryani',category:'Biryani',price:280},{id:'item-3',name:'Veg Hakka Noodles',category:'Chinese',price:190},{id:'item-4',name:'Butter Naan',category:'Breads',price:55},{id:'item-5',name:'Fresh Lime Soda',category:'Beverages',price:90}];
 const defaultStore=():Store=>({tables:Array.from({length:Number(process.env.TABLE_COUNT||20)},(_,i)=>({id:`table-${i+1}`,number:String(i+1),status:'available'})),menu:defaultMenu,sessions:[],orders:[]});
 let store:Store=defaultStore();
@@ -31,6 +33,7 @@ async function boot(){if(existsSync(dbFile)){try{store=JSON.parse(await readFile
 app.get('/health',(_,res)=>res.json({ok:true,petpoojaConfigured:Boolean(process.env.PETPOOJA_APP_KEY&&process.env.PETPOOJA_APP_SECRET&&process.env.PETPOOJA_ACCESS_TOKEN&&process.env.PETPOOJA_REST_ID)}));
 app.get('/api/tables',(_,res)=>res.json({tables:store.tables}));
 app.get('/api/menu',(_,res)=>res.json({items:store.menu}));
+app.get('/order/:rawToken',(_,res)=>res.sendFile(customerPage));
 app.get('/api/tables/:tableId/session',(req,res)=>{const s=[...sessions.values()].find(x=>x.tableId===req.params.tableId&&x.status==='active');if(!s)return res.status(404).json({error:'NO_ACTIVE_SESSION'});res.json({sessionId:s.id,expiresAt:s.expiresAt})});
 
 app.post('/api/tables/:tableId/session',async(req,res)=>{const t=getTable(req.params.tableId);if(!t)return res.status(404).json({error:'TABLE_NOT_FOUND'});if(t.status==='active')return res.status(409).json({error:'TABLE_ALREADY_ACTIVE'});const raw=token(),now=new Date(),expires=new Date(now.getTime()+ttl*60000);const s:Session={id:randomUUID(),tableId:t.id,tokenHash:hash(raw),status:'active',createdAt:now.toISOString(),expiresAt:expires.toISOString()};sessions.set(s.id,s);t.status='active';await persist();const base=process.env.PUBLIC_BASE_URL||`http://localhost:${port}`,url=`${base}/order/${raw}`,qrDataUrl=await QRCode.toDataURL(url,{width:700,margin:2});res.status(201).json({sessionId:s.id,table:t,expiresAt:s.expiresAt,url,qrDataUrl})});
@@ -42,5 +45,6 @@ app.post('/api/public/session/:rawToken/orders',async(req,res)=>{const s=findSes
 app.get('/api/sessions/:sessionId/orders',(req,res)=>{const s=sessions.get(req.params.sessionId);if(!s)return res.status(404).json({error:'SESSION_NOT_FOUND'});res.json({orders:[...orders.values()].filter(o=>o.sessionId===s.id)})});
 app.get('/api/orders/:orderId',(req,res)=>{const o=orders.get(req.params.orderId);if(!o)return res.status(404).json({error:'ORDER_NOT_FOUND'});res.json({order:o})});
 app.post('/api/petpooja/menu/sync',async(_,res)=>{try{return res.json({ok:true,result:await fetchPetpoojaMenu()})}catch(e){return res.status(502).json({ok:false,error:e instanceof Error?e.message:'Unknown error'})}});
+app.post('/api/petpooja/callback',async(req,res)=>{const externalId=String(req.body?.orderID||'');const order=[...orders.values()].find(o=>o.id===externalId||o.petpoojaOrderId===externalId);if(order){const status=Number(req.body?.status);if(status===-1)order.status='rejected';else if(status===1||status===2||status===3||status===4||status===5||status===10)order.status='accepted';await persist()}res.json({ok:true})});
 
 await boot();app.listen(port,()=>console.log(`QR-PP backend listening on :${port}`));
