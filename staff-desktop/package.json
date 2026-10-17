@@ -1,0 +1,1 @@
+{"name":"qr-pp-staff","version":"1.0.0","private":true,"main":"main.js","scripts":{"start":"electron .","build:win":"electron-builder --win nsis"},"devDependencies":{"electron":"^38.2.0","electron-builder":"^26.0.12"},"build":{"appId":"com.streetbell.qrpp.staff","productName":"QR-PP Staff","files":["main.js","../staff-app/**/*"] ,"win":{"target":"nsis"}}}
