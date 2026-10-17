@@ -1,0 +1,1 @@
+const {contextBridge,ipcRenderer}=require('electron');contextBridge.exposeInMainWorld('staff',{printQr:()=>ipcRenderer.invoke('print-qr')});
