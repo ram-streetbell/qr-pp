@@ -1,0 +1,5 @@
+CREATE TABLE outlets (id CHAR(36) PRIMARY KEY, name VARCHAR(160) NOT NULL);
+CREATE TABLE restaurant_tables (id CHAR(36) PRIMARY KEY, outlet_id CHAR(36) NOT NULL, table_number VARCHAR(32) NOT NULL, status ENUM('available','active') NOT NULL DEFAULT 'available', UNIQUE(outlet_id,table_number));
+CREATE TABLE qr_sessions (id CHAR(36) PRIMARY KEY, outlet_id CHAR(36) NOT NULL, table_id CHAR(36) NOT NULL, token_hash CHAR(64) NOT NULL UNIQUE, status ENUM('active','closed','expired') NOT NULL DEFAULT 'active', created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, expires_at TIMESTAMP NOT NULL, closed_at TIMESTAMP NULL, INDEX(table_id,status));
+CREATE TABLE orders (id CHAR(36) PRIMARY KEY, outlet_id CHAR(36) NOT NULL, table_id CHAR(36) NOT NULL, session_id CHAR(36) NOT NULL, external_order_id VARCHAR(120), kot_number VARCHAR(80), status VARCHAR(40) NOT NULL, total DECIMAL(12,2) NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
+CREATE TABLE order_items (id CHAR(36) PRIMARY KEY, order_id CHAR(36) NOT NULL, menu_item_id VARCHAR(120) NOT NULL, item_name VARCHAR(255) NOT NULL, quantity INT NOT NULL, unit_price DECIMAL(12,2) NOT NULL);
