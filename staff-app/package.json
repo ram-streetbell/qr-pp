@@ -1,0 +1,1 @@
+{"name":"qr-pp-staff","version":"0.1.0","private":true,"main":"main.js","scripts":{"start":"electron .","dev":"electron .","build":"electron-builder --win"},"dependencies":{"electron":"^38.2.2"},"devDependencies":{"electron-builder":"^26.0.12"}}
